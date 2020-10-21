@@ -1,0 +1,70 @@
+# This is a basic workflow to help you get started with Actions
+
+name: CICD
+
+# Controls when the action will run. Triggers the workflow on push or pull request
+# events but only for the master branch
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  # This workflow contains a single job called "build"
+  build:
+    runs-on: ubuntu-latest
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+    - name: Set environment variable - TAG
+      run:  echo "TAG=$(date +"%Y.%m.%d.%H.%M.%S")" >> $GITHUB_ENV
+    - name: Set environment variable - OUTPUT
+      run: echo "OUTPUT=verses" >> $GITHUB_ENV
+    - name: Set environment variable - ASSET_NAME
+      run: echo "ASSET_NAME=$(echo "$OUTPUT.pdf")" >> $GITHUB_ENV  
+    - name: Set environment variable - ASSET_PATH
+      run: echo "ASSET_PATH=$(echo "./$ASSET_NAME")" >> $GITHUB_ENV
+    
+    # - name: Test step
+    #   run: |
+    #     echo $TAG
+    #     echo $OUTPUT
+    #     echo $ASSET_NAME
+    #     echo $ASSET_PATH
+
+    # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+    - name: Checkout code
+      id: checkout_code
+      uses: actions/checkout@v2
+
+    - name: Install dependencies
+      id: install_dependencies
+      run: ./setup.sh
+
+    - name: Build project # This would actually build your project, using zip for an example artifact
+      id: build_project
+      run: ./build.sh
+
+    - name: Create release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: v${{ env.TAG }}
+        release_name: Release ${{ env.TAG }}
+        draft: false
+        prerelease: false
+
+    - name: Upload release asset
+      id: upload_release_asset 
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps 
+        asset_path: ${{ env.ASSET_PATH }}
+        asset_name: ${{ env.ASSET_NAME }}
+        asset_content_type: application/pdf
